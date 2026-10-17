@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>心情氣象台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Iansui&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #fdf3e0;
+    --ink: #5a3a22;
+    --ink2: #8a6a50;
+    --accent: #e8893c;
+    --accent-d: #c96d24;
+    --card: #fffaf0;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--paper);
+    background-image: radial-gradient(rgba(150,100,50,.09) 1px, transparent 1px);
+    background-size: 18px 18px;
+    color: var(--ink);
+    font-family: "Iansui", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    line-height: 1.5;
+  }
+  .app { max-width: 520px; margin: 0 auto; padding: 18px 14px 110px; }
+  header.top { text-align: center; margin-bottom: 14px; }
+  h1 { margin: 0; font-size: 2rem; letter-spacing: 3px; }
+  .sub { opacity: .75; font-size: .95rem; margin-top: 2px; }
+  h2 { font-size: 1.1rem; margin: 20px 4px 10px; }
+  p { margin: 0; }
+
+  /* ---------- 通用元件 ---------- */
+  .card {
+    position: relative;
+    background: var(--card);
+    border-radius: 22px 26px 20px 28px / 26px 20px 28px 22px;
+    padding: 14px 16px;
+    box-shadow: 3px 4px 0 rgba(90,58,34,.22);
+  }
+  .card::after {
+    content: "";
+    position: absolute; inset: 0;
+    border: 2.5px solid var(--ink);
+    border-radius: inherit;
+    pointer-events: none;
+    filter: url(#wobble);
+  }
+  .btn {
+    font: inherit;
+    color: var(--ink);
+    background: var(--card);
+    border: 2.5px solid var(--ink);
+    border-radius: 14px 18px 12px 20px;
+    padding: 8px 16px;
+    min-height: 44px;
+    cursor: pointer;
+    box-shadow: 2px 3px 0 rgba(90,58,34,.3);
+    transition: transform .12s, box-shadow .12s, background .2s;
+  }
+  .btn:hover { transform: translateY(-1px) rotate(-.6deg); }
+  .btn:active { transform: translate(2px, 3px); box-shadow: none; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-d); }
+  .btn.danger { color: #b3401f; border-color: #b3401f; }
+  .btn.small { padding: 4px 12px; min-height: 36px; font-size: .9rem; }
+  .btn.big { width: 100%; font-size: 1.2rem; margin-top: 16px; min-height: 52px; letter-spacing: 2px; }
+  .btn:focus-visible, .mood:focus-visible, .cell:focus-visible, .tab:focus-visible, input:focus-visible {
+    outline: 3px solid #4a86b8; outline-offset: 2px;
+  }
+
+  .view { animation: fadeIn .35s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- 今天 ---------- */
+  .banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: #ffe0b0; border: 2px dashed var(--ink);
+    border-radius: 14px 18px 12px 18px;
+    padding: 8px 12px; margin-bottom: 12px; font-size: .95rem;
+  }
+  .stage { padding: 0; height: 270px; overflow: hidden; transition: transform .3s; }
+  .stage.bump { animation: bump .5s ease; }
+  @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.03) rotate(-.5deg); } 100% { transform: scale(1); } }
+  .stage .bg { position: absolute; inset: 0; opacity: 0; transition: opacity .7s ease; }
+  .stage .bg.show { opacity: 1; }
+  #fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .icon { position: absolute; left: 50%; top: 18px; width: 150px; height: 150px; margin-left: -75px; animation: float 4.5s ease-in-out infinite; }
+  .icon svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 4px 0 rgba(90,58,34,.18)); }
+  .icon.pop svg { animation: pop .6s cubic-bezier(.2,1.4,.4,1); }
+  .icon .spin { transform-origin: 50px 50px; animation: spin 24s linear infinite; }
+  .icon .flick { animation: flick 2.6s steps(1) infinite; }
+  @keyframes float { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-9px) rotate(2deg); } }
+  @keyframes pop { 0% { transform: scale(.4) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.12) rotate(3deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes flick { 0%,100% { opacity: 1; } 8% { opacity: .35; } 12% { opacity: 1; } 16% { opacity: .5; } 20% { opacity: 1; } }
+  .pill {
+    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+    background: rgba(255,250,240,.92); border: 2px solid var(--ink);
+    border-radius: 999px; padding: 4px 18px; font-size: 1.15rem; white-space: nowrap;
+  }
+
+  .quote { margin-top: 14px; display: flex; align-items: center; gap: 10px; transform: rotate(-.6deg); background: #fff6dc; }
+  .quote p { flex: 1; line-height: 1.7; min-height: 3.4em; display: flex; align-items: center; }
+
+  .moods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .mood {
+    font: inherit; color: var(--ink); background: var(--card);
+    border: 2.5px solid var(--ink);
+    border-radius: 16px 20px 14px 22px;
+    padding: 8px 2px 6px; min-height: 44px; cursor: pointer;
+    box-shadow: 2px 3px 0 rgba(90,58,34,.25);
+    transition: transform .15s, background .2s;
+  }
+  .mood:nth-child(odd)  { transform: rotate(-1.5deg); }
+  .mood:nth-child(even) { transform: rotate(1.5deg); }
+  .mood:hover { transform: rotate(0) scale(1.07); }
+  .mood:active { transform: scale(.93); }
+  .mood.active { background: var(--accent); color: #fff; transform: rotate(0) scale(1.05); }
+  .mood svg { width: 40px; height: 40px; display: block; margin: 0 auto 2px; }
+  .mood span { font-size: .95rem; }
+
+  .note-card { padding: 10px 14px 6px; }
+  .note-card input {
+    width: 100%; font: inherit; color: var(--ink); background: transparent;
+    border: none; border-bottom: 2px dashed var(--ink2);
+    padding: 8px 2px; font-size: 1.05rem;
+  }
+  .note-card input::placeholder { color: #b59c85; }
+  .count { text-align: right; font-size: .8rem; opacity: .65; margin-top: 2px; }
+  .status { text-align: center; margin-top: 10px; font-size: .95rem; color: var(--ink2); min-height: 1.5em; }
+  .status.dirty { color: #b3401f; }
+  .streak { text-align: center; margin-top: 4px; font-size: .95rem; }
+
+  /* ---------- 月曆 ---------- */
+  .monthbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .monthbar .title { font-size: 1.25rem; }
+  .monthbar .btn { width: 44px; padding: 0; font-size: 1.3rem; }
+  .monthbar .btn:disabled { opacity: .35; cursor: default; box-shadow: none; transform: none; }
+  .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+  .dow { text-align: center; font-size: .85rem; opacity: .7; padding-bottom: 2px; }
+  .cell {
+    font: inherit; color: var(--ink); background: var(--card);
+    border: 2px solid rgba(90,58,34,.45);
+    border-radius: 10px 14px 10px 14px;
+    aspect-ratio: 1 / 1.05; padding: 2px 0 0; cursor: pointer; min-width: 0; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    transition: transform .12s, background .2s;
+  }
+  .cell:hover:not(:disabled) { transform: scale(1.06); }
+  .cell .num { font-size: .72rem; opacity: .7; line-height: 1.2; }
+  .cell svg { width: 78%; max-width: 38px; height: auto; margin-top: 1px; }
+  .cell.today { border: 2.5px solid var(--accent); background: #ffe9c6; }
+  .cell.sel { border-color: var(--ink); box-shadow: 2px 3px 0 rgba(90,58,34,.35); }
+  .cell:disabled { opacity: .35; cursor: default; }
+  .cell.blank { visibility: hidden; }
+  .detail { margin-top: 16px; }
+  .detail .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .detail .row svg { width: 48px; height: 48px; }
+  .detail .dt { opacity: .7; font-size: .9rem; }
+  .detail .nm { font-size: 1.2rem; }
+  .detail .nt { margin: 8px 0; font-size: 1.05rem; word-break: break-word; }
+  .detail .qt { margin: 6px 0 10px; font-size: .92rem; color: var(--ink2); }
+  .detail .acts { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* ---------- 統計 ---------- */
+  .sum { text-align: center; font-size: 1.1rem; line-height: 1.7; }
+  .chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .chip { text-align: center; background: #fff6dc; border: 2px dashed var(--ink2); border-radius: 14px; padding: 6px 2px; font-size: .85rem; }
+  .chip b { display: block; font-size: 1.4rem; font-weight: normal; color: var(--accent-d); }
+  .bars { display: grid; gap: 8px; }
+  .bar { display: grid; grid-template-columns: 34px 3.2em 1fr 2em; gap: 8px; align-items: center; }
+  .bar svg { width: 32px; height: 32px; }
+  .bar .track { height: 16px; background: rgba(90,58,34,.08); border-radius: 10px; overflow: hidden; }
+  .bar .fill { height: 100%; width: 0; border-radius: 10px; border: 2px solid var(--ink); transition: width .8s cubic-bezier(.2,.8,.2,1); }
+  .bar .n { text-align: right; }
+  .recent { display: grid; gap: 10px; }
+  .recent .it { display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: start; }
+  .recent svg { width: 32px; height: 32px; }
+  .recent .d { font-size: .8rem; opacity: .65; }
+  .recent .t { word-break: break-word; }
+  .empty-tip { text-align: center; opacity: .65; padding: 6px 0; }
+
+  /* ---------- 備份 ---------- */
+  .stack { display: grid; gap: 12px; }
+  .stack .desc { font-size: .9rem; color: var(--ink2); }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .switch input { width: 24px; height: 24px; accent-color: var(--accent); }
+  .importbox { margin-top: 10px; padding: 10px; border: 2px dashed var(--ink); border-radius: 14px; background: #fff6dc; }
+  .importbox .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .warn { margin-bottom: 12px; text-align: center; font-size: .9rem; color: #b3401f; }
+
+  /* ---------- 導覽列與提示 ---------- */
+  .tabs {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    width: min(500px, calc(100% - 20px));
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    background: var(--card); border: 2.5px solid var(--ink);
+    border-radius: 24px 28px 22px 30px; padding: 4px; z-index: 10;
+    box-shadow: 3px 4px 0 rgba(90,58,34,.25);
+  }
+  .tab {
+    font: inherit; color: var(--ink); background: transparent; border: none;
+    border-radius: 18px; min-height: 54px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    font-size: .85rem; transition: background .2s, color .2s;
+  }
+  .tab svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .tab[aria-current="page"] { background: var(--accent); color: #fff; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom));
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    background: var(--ink); color: #fff6dc; padding: 10px 20px; border-radius: 16px;
+    transition: opacity .3s, transform .3s; z-index: 20; max-width: calc(100% - 40px); text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="wobble" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4"/>
+    </filter>
+  </defs>
+</svg>
+
+<div class="app">
+  <header class="top">
+    <h1>心情氣象台</h1>
+    <div class="sub" id="subtitle"></div>
+  </header>
+
+  <div class="warn" id="warn" hidden>這個瀏覽器無法儲存資料，重新整理後紀錄會消失。</div>
+
+  <!-- ========== 今天 ========== -->
+  <section class="view" id="view-today">
+    <div class="banner" id="editBanner" hidden>
+      <span id="editText"></span>
+      <button class="btn small" id="backToday" type="button">回到今天</button>
+    </div>
+
+    <div class="card stage" id="stage" aria-live="polite">
+      <canvas id="fx"></canvas>
+      <div class="icon" id="icon"></div>
+      <div class="pill" id="label"></div>
+    </div>
+
+    <div class="card quote">
+      <p id="quote"></p>
+      <button class="btn small" id="again" type="button">換一句</button>
+    </div>
+
+    <h2 id="moodTitle">今天的心情是？</h2>
+    <div class="moods" id="moods"></div>
+
+    <h2 id="noteTitle">今天的一句心情</h2>
+    <div class="card note-card">
+      <input id="note" type="text" maxlength="40" enterkeyhint="done" autocomplete="off"
+             placeholder="例如：報告終於交出去了，鬆一口氣">
+      <div class="count" id="count">0 / 40</div>
+    </div>
+
+    <button class="btn primary big" id="saveBtn" type="button">儲存今天心情</button>
+    <div class="status" id="status"></div>
+    <div class="streak" id="streak"></div>
+  </section>
+
+  <!-- ========== 月曆 ========== -->
+  <section class="view" id="view-calendar" hidden>
+    <div class="monthbar">
+      <button class="btn" id="calPrev" type="button" aria-label="上個月">‹</button>
+      <div class="title" id="calTitle"></div>
+      <button class="btn" id="calNext" type="button" aria-label="下個月">›</button>
+    </div>
+    <div class="card"><div class="grid" id="calGrid"></div></div>
+    <div class="card detail" id="detail" hidden></div>
+  </section>
+
+  <!-- ========== 統計 ========== -->
+  <section class="view" id="view-stats" hidden>
+    <div class="monthbar">
+      <button class="btn" id="stPrev" type="button" aria-label="上個月">‹</button>
+      <div class="title" id="stTitle"></div>
+      <button class="btn" id="stNext" type="button" aria-label="下個月">›</button>
+    </div>
+    <div class="card">
+      <div class="sum" id="sum"></div>
+      <div class="chips">
+        <div class="chip"><b id="chDays">0</b>本月記錄天數</div>
+        <div class="chip"><b id="chNow">0</b>目前連續天數</div>
+        <div class="chip"><b id="chBest">0</b>最長連續天數</div>
+      </div>
+    </div>
+    <h2>本月天氣分布</h2>
+    <div class="card"><div class="bars" id="bars"></div></div>
+    <h2>最近的一句話</h2>
+    <div class="card"><div class="recent" id="recent"></div></div>
+  </section>
+
+  <!-- ========== 備份 ========== -->
+  <section class="view" id="view-backup" hidden>
+    <div class="stack">
+      <div class="card">
+        <div class="switch">
+          <label for="animToggle">天氣動態效果</label>
+          <input type="checkbox" id="animToggle">
+        </div>
+        <p class="desc" style="margin-top:6px">手機覺得卡卡的，或想省電時可以關掉。</p>
+      </div>
+      <div class="card">
+        <h2 style="margin:0 0 6px">匯出備份</h2>
+        <p class="desc">把所有紀錄下載成一個檔案，換手機或清除瀏覽器資料前先備份。</p>
+        <button class="btn primary" id="exportBtn" type="button" style="margin-top:10px">下載備份檔</button>
+      </div>
+      <div class="card">
+        <h2 style="margin:0 0 6px">匯入備份</h2>
+        <p class="desc">選擇之前下載的備份檔，可以選擇合併或覆蓋。</p>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <button class="btn" id="importBtn" type="button" style="margin-top:10px">選擇備份檔</button>
+        <div class="importbox" id="importBox" hidden>
+          <div id="importInfo"></div>
+          <div class="acts">
+            <button class="btn small primary" id="doMerge" type="button">合併（同一天以備份為準）</button>
+            <button class="btn small danger" id="doReplace" type="button">覆蓋全部</button>
+            <button class="btn small" id="doCancel" type="button">取消</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2 style="margin:0 0 6px">清除資料</h2>
+        <p class="desc">刪除這個瀏覽器裡的所有心情紀錄，無法復原。</p>
+        <button class="btn danger" id="clearBtn" type="button" style="margin-top:10px">清除全部紀錄</button>
+      </div>
+    </div>
+  </section>
+
+  <nav class="tabs" aria-label="主選單">
+    <button class="tab" type="button" data-go="today">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>今天</button>
+    <button class="tab" type="button" data-go="calendar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>月曆</button>
+    <button class="tab" type="button" data-go="stats">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>統計</button>
+    <button class="tab" type="button" data-go="backup">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8l8-4 8 4v9l-8 4-8-4zM4 8l8 4 8-4M12 12v9"/></svg>備份</button>
+  </nav>
+  <div class="toast" id="toast" role="status"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var KEY = 'moodWeatherDiary';
+  var SKEY = 'moodWeatherSettings';
+  var NOTE_MAX = 40;
+  var $ = function (id) { return document.getElementById(id); };
+  function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+  function h(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  /* =====================================================
+     手繪風 SVG 天氣圖
+  ===================================================== */
+  var S = 'stroke="#5a3a22" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"';
+  var CLOUD = 'M26 68 Q10 68 14 52 Q18 40 32 43 Q36 26 54 29 Q72 30 72 46 Q90 46 86 60 Q85 68 72 68 Z';
+  function cloudSvg(fill, dy) {
+    return '<path transform="translate(0,' + (dy || 0) + ')" d="' + CLOUD + '" fill="' + fill + '" ' + S + '/>';
+  }
+  function svg(inner) { return '<svg viewBox="0 0 100 100" aria-hidden="true">' + inner + '</svg>'; }
+  var rays = '';
+  (function () {
+    for (var i = 0; i < 8; i++) {
+      var a = i * Math.PI / 4;
+      rays += '<line x1="' + (50 + Math.cos(a) * 26).toFixed(1) + '" y1="' + (50 + Math.sin(a) * 26).toFixed(1) +
+              '" x2="' + (50 + Math.cos(a) * 38).toFixed(1) + '" y2="' + (50 + Math.sin(a) * 38).toFixed(1) + '" ' + S + '/>';
+    }
+  })();
+  function sunSvg(face) {
+    return svg('<g class="spin">' + rays + '</g><circle cx="50" cy="50" r="17" fill="#ffd25e" ' + S + '/>' + face);
+  }
+  var HAPPY_FACE = '<path d="M43 48 q2 -3 4 0 M54 48 q2 -3 4 0 M43 55 q7 6 14 0" fill="none" ' + S + '/>';
+  var IDLE_FACE = '<path d="M43 48 h4 M54 48 h4 M45 56 q5 3 10 0" fill="none" ' + S + '/>';
+  var IDLE_ICON = sunSvg(IDLE_FACE);
+  var IDLE_BG = 'linear-gradient(180deg,#fff1c9,#ffdca0)';
+
+  /* =====================================================
+     心情資料
+  ===================================================== */
+  var MOODS = {
+    happy: {
+      name: '開心', weather: '晴天', color: '#ffc23d',
+      bg: 'linear-gradient(180deg,#ffeaa8,#ffc86b)',
+      svg: sunSvg(HAPPY_FACE),
+      quotes: [
+        '快樂不是擁有很多，而是珍惜眼前所有。',
+        '今天的陽光，是專門為你準備的。',
+        '把這份好心情收進口袋，需要時再拿出來用。',
+        '你笑起來的樣子，連天氣都會變好。',
+        '好事不用多，今天這一件就夠發光了。'
+      ]
+    },
+    calm: {
+      name: '平靜', weather: '多雲', color: '#9fc6dc',
+      bg: 'linear-gradient(180deg,#f7f0df,#cfe3ee)',
+      svg: svg('<circle cx="68" cy="34" r="13" fill="#ffd25e" ' + S + '/>' + cloudSvg('#ffffff', 4) +
+               '<path d="M38 56 q2 -2 4 0 M52 56 q2 -2 4 0" fill="none" ' + S + '/>'),
+      quotes: [
+        '慢慢來，雲也是一朵一朵飄過去的。',
+        '平靜不是什麼都沒有，而是心裡剛剛好。',
+        '深呼吸一下，你已經做得很好了。',
+        '不用急著變得更好，此刻的你就很足夠。',
+        '安靜的日子，是替未來充電的日子。'
+      ]
+    },
+    sad: {
+      name: '難過', weather: '下雨', color: '#5b8db8',
+      bg: 'linear-gradient(180deg,#c9d6e2,#8fa6bb)',
+      svg: svg(cloudSvg('#d9e2ea', -8) +
+               '<line x1="34" y1="72" x2="30" y2="84" stroke="#4a86b8" stroke-width="4" stroke-linecap="round"/>' +
+               '<line x1="50" y1="74" x2="46" y2="88" stroke="#4a86b8" stroke-width="4" stroke-linecap="round"/>' +
+               '<line x1="66" y1="72" x2="62" y2="84" stroke="#4a86b8" stroke-width="4" stroke-linecap="round"/>' +
+               '<path d="M38 48 q2 2 4 0 M54 48 q2 2 4 0 M42 56 q6 -4 12 0" fill="none" ' + S + '/>'),
+      quotes: [
+        '雨總會停，而你已經很努力撐過來了。',
+        '難過的時候，允許自己哭一下也沒關係。',
+        '被雨淋過的花，會開得更用力。',
+        '今天不用堅強，明天再說也來得及。',
+        '你不是一個人，這場雨很多人都淋過。'
+      ]
+    },
+    anxious: {
+      name: '焦慮', weather: '雷雨', color: '#6c7494',
+      bg: 'linear-gradient(180deg,#8d97b3,#4d556f)',
+      svg: svg(cloudSvg('#a9b0c4', -10) +
+               '<polygon class="flick" points="52,56 40,76 50,76 44,92 64,68 53,68 60,56" fill="#ffd25e" ' + S + '/>' +
+               '<path d="M38 40 q2 -2 4 0 M54 40 q2 -2 4 0" fill="none" ' + S + '/>'),
+      quotes: [
+        '一次只做一件事，風暴就會變小一點。',
+        '你擔心的事，多半沒有想像中那麼糟。',
+        '先吸氣、再吐氣，雷聲很快就會過去。',
+        '把煩惱寫下來，它就從腦袋搬到紙上了。',
+        '做不完沒關係，先完成最小的那一步。'
+      ]
+    },
+    angry: {
+      name: '生氣', weather: '熱浪', color: '#e5683a',
+      bg: 'linear-gradient(180deg,#ffb88a,#e5683a)',
+      svg: svg('<circle cx="50" cy="42" r="18" fill="#ff8a4c" ' + S + '/>' +
+               '<path d="M42 38 l6 3 M58 38 l-6 3 M43 51 q7 -5 14 0" fill="none" ' + S + '/>' +
+               '<path d="M16 72 q8 -8 17 0 t17 0 t17 0 t17 0" fill="none" stroke="#e5532d" stroke-width="3.5" stroke-linecap="round"/>' +
+               '<path d="M16 84 q8 -8 17 0 t17 0 t17 0 t17 0" fill="none" stroke="#e5532d" stroke-width="3.5" stroke-linecap="round"/>' +
+               '<path d="M50 14 q-6 -6 0 -12 M30 20 q-4 -5 0 -9 M70 20 q4 -5 0 -9" fill="none" ' + S + '/>'),
+      quotes: [
+        '先離開現場喝杯水，火氣會慢慢退下去。',
+        '生氣代表你在乎，但別讓它燒傷自己。',
+        '把情緒說出來，比把它藏起來更輕鬆。',
+        '數到十再開口，你會感謝那十秒鐘。',
+        '熱浪終會過去，你不必在最燙的時候做決定。'
+      ]
+    },
+    tired: {
+      name: '疲倦', weather: '起霧', color: '#b3a591',
+      bg: 'linear-gradient(180deg,#ebe4d8,#bfb4a4)',
+      svg: svg(cloudSvg('#ece6dc', -10) +
+               '<path d="M14 68 q10 -6 20 0 t20 0 t20 0 t12 0" fill="none" stroke="#a89a88" stroke-width="4" stroke-linecap="round"/>' +
+               '<path d="M22 80 q10 -6 20 0 t20 0 t20 0" fill="none" stroke="#a89a88" stroke-width="4" stroke-linecap="round"/>' +
+               '<path d="M38 36 h8 M54 36 h8" fill="none" ' + S + '/>'),
+      quotes: [
+        '休息不是偷懶，是為了走更遠的路。',
+        '今天先到這裡就好，明天的你會感謝現在的你。',
+        '霧再濃，睡一覺醒來也會散開。',
+        '你已經撐很久了，現在可以放下一下。',
+        '把手機放下，給自己一個早一點的晚安。'
+      ]
+    },
+    excited: {
+      name: '興奮', weather: '彩虹', color: '#f28aa6',
+      bg: 'linear-gradient(180deg,#ffd9df,#ffc59a)',
+      svg: svg('<path d="M10 74 A40 40 0 0 1 90 74" fill="none" stroke="#e5532d" stroke-width="6" stroke-linecap="round"/>' +
+               '<path d="M18 74 A32 32 0 0 1 82 74" fill="none" stroke="#ffb43c" stroke-width="6" stroke-linecap="round"/>' +
+               '<path d="M26 74 A24 24 0 0 1 74 74" fill="none" stroke="#7bbf5a" stroke-width="6" stroke-linecap="round"/>' +
+               '<path d="M34 74 A16 16 0 0 1 66 74" fill="none" stroke="#5a9ad8" stroke-width="6" stroke-linecap="round"/>' +
+               '<ellipse cx="14" cy="78" rx="12" ry="7" fill="#fff" ' + S + '/>' +
+               '<ellipse cx="86" cy="78" rx="12" ry="7" fill="#fff" ' + S + '/>' +
+               '<path d="M50 14 v8 M44 18 h12 M24 30 v6 M21 33 h6" fill="none" ' + S + '/>'),
+      quotes: [
+        '帶著這股衝勁，今天的你無所不能！',
+        '好事正在發生，記得好好享受這一刻。',
+        '把期待種下去，彩虹就在不遠處。',
+        '心跳加速的感覺，就是你正在往前走。',
+        '放手去試吧，今天的運氣站在你這邊。'
+      ]
+    }
+  };
+  var ORDER = ['happy', 'calm', 'sad', 'anxious', 'angry', 'tired', 'excited'];
+  var IDLE_QUOTE = '選一個心情，看看今天的天氣吧。';
+
+  /* =====================================================
+     儲存與資料清洗
+  ===================================================== */
+  var storageOK = true;
+  function readJSON(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      var v = JSON.parse(raw);
+      return (v && typeof v === 'object') ? v : fallback;
+    } catch (e) { storageOK = false; return fallback; }
+  }
+  function writeJSON(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); }
+    catch (e) { storageOK = false; }
+    $('warn').hidden = storageOK;
+  }
+  function cleanEntries(src) {
+    var out = {}, ok = 0, bad = 0;
+    Object.keys(src).forEach(function (k) {
+      var e = src[k];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && e && typeof e === 'object' && typeof e.mood === 'string' && has(MOODS, e.mood)) {
+        out[k] = {
+          mood: e.mood,
+          note: typeof e.note === 'string' ? e.note.slice(0, NOTE_MAX) : '',
+          quote: typeof e.quote === 'string' ? e.quote.slice(0, 120) : '',
+          updatedAt: typeof e.updatedAt === 'string' ? e.updatedAt : ''
+        };
+        ok++;
+      } else { bad++; }
+    });
+    return { entries: out, ok: ok, bad: bad };
+  }
+
+  var data = cleanEntries(readJSON(KEY, {})).entries;
+  var settings = readJSON(SKEY, null);
+  var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if (!settings || typeof settings.anim !== 'boolean') settings = { anim: !reduceMotion };
+  var animOn = settings.anim;
+  $('warn').hidden = storageOK;
+
+  /* =====================================================
+     日期工具（一律使用本地時區）
+  ===================================================== */
+  function dateKey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function parseKey(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+  function fmtLong(k) {
+    var d = parseKey(k);
+    return d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 星期' + WEEK[d.getDay()];
+  }
+  function fmtShort(k) { var d = parseKey(k); return (d.getMonth() + 1) + '/' + d.getDate(); }
+  var todayKey = dateKey(new Date());
+
+  function currentStreak() {
+    var d = new Date();
+    if (!data[dateKey(d)]) d.setDate(d.getDate() - 1);
+    var n = 0;
+    while (data[dateKey(d)]) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  function longestStreak() {
+    var keys = Object.keys(data).sort(), best = 0, run = 0, prev = null;
+    keys.forEach(function (k) {
+      var d = parseKey(k);
+      if (prev && Math.round((d - prev) / 86400000) === 1) run++; else run = 1;
+      if (run > best) best = run;
+      prev = d;
+    });
+    return best;
+  }
+
+  var toastTimer = 0;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+
+  /* =====================================================
+     Canvas 天氣動畫
+  ===================================================== */
+  var cv = $('fx');
+  var ctx = cv.getContext ? cv.getContext('2d') : null;
+  var W = 0, H = 0, raf = 0, lastTs = 0;
+  var scene = { id: 'idle', t0: 0 };
+
+  function circ(x, y, r) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 6.2832); }
+  function cloudShape(x, y, s, fill) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    circ(x, y, 18 * s); circ(x + 20 * s, y - 10 * s, 24 * s); circ(x + 46 * s, y - 2 * s, 19 * s);
+    circ(x + 12 * s, y + 8 * s, 16 * s); circ(x + 34 * s, y + 8 * s, 16 * s);
+    ctx.fill();
+  }
+  function mkDrops(n, vmin, vmax) {
+    var a = [];
+    for (var i = 0; i < n; i++) a.push({ x: rnd(0, W), y: rnd(-H, H), l: rnd(10, 18), v: rnd(vmin, vmax) });
+    return a;
+  }
+  function makeBolt() {
+    var x = rnd(W * .2, W * .8), y = 40, pts = [[x, y]];
+    while (y < H - 20) { y += rnd(18, 34); x += rnd(-18, 18); pts.push([x, y]); }
+    return pts;
+  }
+  var CONFETTI = ['#ff6b6b', '#ffb43c', '#ffe066', '#7bbf5a', '#5a9ad8', '#c084fc'];
+
+  var BUILD = {
+    happy: function (s) {
+      s.motes = [];
+      for (var i = 0; i < 26; i++) s.motes.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1.5, 3.6), v: rnd(10, 30), p: rnd(0, 6.28) });
+    },
+    calm: function (s) {
+      s.clouds = [];
+      for (var i = 0; i < 5; i++) s.clouds.push({ x: rnd(-80, W), y: rnd(20, H * .7), s: rnd(.7, 1.4), v: rnd(6, 16), a: rnd(.55, .9) });
+    },
+    sad: function (s) {
+      s.drops = mkDrops(70, 300, 520); s.ripples = [];
+      s.clouds = [{ x: W * .02, y: 34, s: 1.5 }, { x: W * .45, y: 24, s: 1.7 }, { x: W * .74, y: 44, s: 1.3 }];
+    },
+    anxious: function (s) {
+      s.drops = mkDrops(110, 560, 820); s.ripples = [];
+      s.clouds = [{ x: -10, y: 30, s: 1.7 }, { x: W * .35, y: 20, s: 1.9 }, { x: W * .68, y: 38, s: 1.6 }];
+      s.flash = 0; s.bolt = null; s.echo = 0; s.next = 1;
+    },
+    angry: function (s) {
+      s.embers = [];
+      for (var i = 0; i < 40; i++) s.embers.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1.4, 3.4), v: rnd(30, 90), p: rnd(0, 6.28) });
+    },
+    tired: function (s) {
+      s.fog = []; s.zs = [];
+      for (var i = 0; i < 7; i++) s.fog.push({ x: rnd(0, W), y: rnd(H * .2, H), r: rnd(70, 130), v: rnd(5, 14) * (Math.random() < .5 ? -1 : 1), a: rnd(.25, .5) });
+      for (var j = 0; j < 4; j++) s.zs.push({ x: rnd(W * .55, W * .85), y: rnd(60, H - 40), v: rnd(12, 22), p: rnd(0, 6.28), z: rnd(16, 28) });
+    },
+    excited: function (s) {
+      s.conf = []; s.sparks = [];
+      for (var i = 0; i < 60; i++) s.conf.push({ x: rnd(0, W), y: rnd(-H, H), w: rnd(5, 9), h: rnd(3, 6), v: rnd(40, 90), vx: rnd(-14, 14), r: rnd(0, 6.28), vr: rnd(-4, 4), c: CONFETTI[i % CONFETTI.length] });
+      for (var j = 0; j < 14; j++) s.sparks.push({ x: rnd(10, W - 10), y: rnd(10, H * .6), p: rnd(0, 6.28), sp: rnd(1.5, 3.5), z: rnd(4, 8) });
+    }
+  };
+  BUILD.idle = BUILD.calm;
+
+  function drawDrops(s, dt, groundY, color) {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath();
+    s.drops.forEach(function (d) {
+      d.y += d.v * dt; d.x -= d.v * .12 * dt;
+      if (d.y > groundY) {
+        if (s.ripples.length < 24) s.ripples.push({ x: d.x, y: groundY + rnd(-4, 8), r: 1, a: .6 });
+        d.y = rnd(-40, -5); d.x = rnd(0, W + 40);
+      }
+      ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - d.l * .12, d.y + d.l);
+    });
+    ctx.stroke();
+    s.ripples = s.ripples.filter(function (r) {
+      r.r += 30 * dt; r.a -= .9 * dt;
+      if (r.a <= 0) return false;
+      ctx.strokeStyle = 'rgba(255,255,255,' + r.a.toFixed(2) + ')'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(r.x, r.y, r.r, r.r * .35, 0, 0, 6.2832); ctx.stroke();
+      return true;
+    });
+  }
+
+  var DRAW = {
+    happy: function (s, dt, t) {
+      var L = Math.max(W, H) * 1.2;
+      ctx.save(); ctx.translate(W * .5, H * .3); ctx.rotate(t * .12);
+      ctx.fillStyle = 'rgba(255,236,150,.28)';
+      for (var i = 0; i < 12; i++) {
+        ctx.rotate(Math.PI * 2 / 12);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-16, -L); ctx.lineTo(16, -L); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+      s.motes.forEach(function (m) {
+        m.y -= m.v * dt; m.x += Math.sin(t * 1.2 + m.p) * .3;
+        if (m.y < -8) { m.y = H + 8; m.x = rnd(0, W); }
+        ctx.fillStyle = 'rgba(255,255,255,' + (.35 + .35 * Math.sin(t * 2 + m.p)).toFixed(2) + ')';
+        ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 6.2832); ctx.fill();
+      });
+    },
+    calm: function (s, dt, t) {
+      s.clouds.forEach(function (c) {
+        c.x += c.v * dt;
+        if (c.x > W + 20) { c.x = -100 * c.s; c.y = rnd(20, H * .7); }
+        cloudShape(c.x, c.y + Math.sin(t * .8 + c.s * 5) * 3, c.s, 'rgba(255,255,255,' + c.a + ')');
+      });
+    },
+    sad: function (s, dt, t) {
+      s.clouds.forEach(function (c, i) { cloudShape(c.x + Math.sin(t * .3 + i) * 8, c.y, c.s, 'rgba(120,138,160,.9)'); });
+      drawDrops(s, dt, H - 16, 'rgba(70,120,170,.75)');
+    },
+    anxious: function (s, dt, t) {
+      var still = s.still;
+      s.clouds.forEach(function (c, i) { cloudShape(c.x + Math.sin(t * .5 + i) * 10, c.y, c.s, 'rgba(58,64,86,.95)'); });
+      drawDrops(s, dt, H - 16, 'rgba(190,205,235,.8)');
+      if (!still) {
+        if (t > s.next) { s.flash = 1; s.bolt = makeBolt(); s.next = t + rnd(1.8, 4); s.echo = t + .14; }
+        if (s.echo && t > s.echo) { s.flash = .85; s.echo = 0; }
+        s.flash = Math.max(0, s.flash - dt * 3);
+      }
+      if (s.bolt && s.flash > .25) {
+        ctx.save();
+        ctx.strokeStyle = '#fff7c2'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+        ctx.shadowColor = '#ffe066'; ctx.shadowBlur = 18;
+        ctx.beginPath();
+        s.bolt.forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
+        ctx.stroke(); ctx.restore();
+      }
+      if (s.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (s.flash * .32).toFixed(2) + ')'; ctx.fillRect(0, 0, W, H); }
+    },
+    angry: function (s, dt, t) {
+      var g = ctx.createRadialGradient(W / 2, H, 10, W / 2, H, H * (.9 + .08 * Math.sin(t * 3)));
+      g.addColorStop(0, 'rgba(255,90,40,.55)'); g.addColorStop(1, 'rgba(255,90,40,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      for (var k = 0; k < 6; k++) {
+        ctx.beginPath();
+        for (var x = 0; x <= W; x += 6) {
+          var y = H * (.3 + k * .1) + Math.sin(x * .05 + t * 2.4 + k) * 5;
+          if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.stroke();
+      }
+      s.embers.forEach(function (e) {
+        e.y -= e.v * dt; e.x += Math.sin(t * 2 + e.p) * .5;
+        if (e.y < -6) { e.y = H + 6; e.x = rnd(0, W); }
+        var life = Math.max(0, Math.min(1, e.y / H));
+        ctx.fillStyle = 'rgba(255,' + Math.round(120 + 100 * (1 - life)) + ',60,' + (.25 + .6 * (1 - life)).toFixed(2) + ')';
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.2832); ctx.fill();
+      });
+    },
+    tired: function (s, dt, t) {
+      s.fog.forEach(function (f) {
+        f.x += f.v * dt;
+        if (f.x > W + f.r) f.x = -f.r; else if (f.x < -f.r) f.x = W + f.r;
+        var g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+        g.addColorStop(0, 'rgba(255,255,255,' + f.a + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g; ctx.fillRect(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2);
+      });
+      s.zs.forEach(function (z) {
+        z.y -= z.v * dt; z.x += Math.sin(t + z.p) * .4;
+        if (z.y < 20) { z.y = H - 30; z.x = rnd(W * .55, W * .85); }
+        ctx.fillStyle = 'rgba(90,58,34,' + Math.max(0, Math.min(.55, z.y / H)).toFixed(2) + ')';
+        ctx.font = z.z + 'px Iansui, sans-serif';
+        ctx.fillText('z', z.x, z.y);
+      });
+    },
+    excited: function (s, dt, t) {
+      var p = s.still ? 1 : Math.min(1, t / 1.8);
+      var cols = ['#e5532d', '#ff9f3c', '#ffd23c', '#7bbf5a', '#5a9ad8', '#a06bd8'];
+      var cx = W / 2, cy = H * .82, R = Math.min(W * .44, H * .72);
+      ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.globalAlpha = .75;
+      cols.forEach(function (c, i) {
+        ctx.strokeStyle = c;
+        ctx.beginPath(); ctx.arc(cx, cy, R - i * 9, Math.PI, Math.PI + Math.PI * p); ctx.stroke();
+      });
+      ctx.globalAlpha = 1;
+      s.conf.forEach(function (c) {
+        c.y += c.v * dt; c.x += c.vx * dt; c.r += c.vr * dt;
+        if (c.y > H + 10) { c.y = -10; c.x = rnd(0, W); }
+        ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.r);
+        ctx.fillStyle = c.c; ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h); ctx.restore();
+      });
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      s.sparks.forEach(function (k) {
+        var a = .5 + .5 * Math.sin(t * k.sp + k.p);
+        if (a < .15) return;
+        var z = k.z * a;
+        ctx.globalAlpha = a;
+        ctx.beginPath(); ctx.moveTo(k.x - z, k.y); ctx.lineTo(k.x + z, k.y); ctx.moveTo(k.x, k.y - z); ctx.lineTo(k.x, k.y + z); ctx.stroke();
+      });
+      ctx.globalAlpha = 1;
+    }
+  };
+  DRAW.idle = DRAW.calm;
+
+  function initScene(id) {
+    scene = { id: id, t0: performance.now(), still: !animOn };
+    if (!ctx || !W) return;
+    BUILD[id](scene);
+    if (!animOn) drawFrame(0, scene.t0 + 3000);
+  }
+  function drawFrame(dt, ts) {
+    if (!ctx || !W) return;
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    DRAW[scene.id](scene, dt, (ts - scene.t0) / 1000);
+    ctx.restore();
+  }
+  function frame(ts) {
+    raf = requestAnimationFrame(frame);
+    var dt = Math.min((ts - lastTs) / 1000, .05);
+    lastTs = ts;
+    drawFrame(dt, ts);
+  }
+  function resizeCanvas() {
+    if (!ctx) return;
+    var r = cv.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    initScene(scene.id);
+  }
+  function syncLoop() {
+    var run = !!ctx && animOn && currentView === 'today' && !document.hidden && W > 0;
+    if (run && !raf) { lastTs = performance.now(); raf = requestAnimationFrame(frame); }
+    else if (!run && raf) { cancelAnimationFrame(raf); raf = 0; }
+  }
+  if (window.ResizeObserver) new ResizeObserver(function () { resizeCanvas(); syncLoop(); }).observe($('stage'));
+  window.addEventListener('resize', function () { resizeCanvas(); syncLoop(); });
+  document.addEventListener('visibilitychange', function () { syncLoop(); checkDayChange(); });
+
+  /* =====================================================
+     今天頁
+  ===================================================== */
+  var editDate = todayKey;
+  var draft = { mood: null, note: '', quote: '' };
+  var currentView = 'today';
+
+  function loadDraft(key) {
+    var e = data[key];
+    draft = e ? { mood: e.mood, note: e.note, quote: e.quote || '' } : { mood: null, note: '', quote: '' };
+  }
+  function pickQuote(id, avoid) {
+    var list = MOODS[id].quotes, q;
+    do { q = list[Math.floor(Math.random() * list.length)]; } while (list.length > 1 && q === avoid);
+    return q;
+  }
+  function isDirty() {
+    var e = data[editDate];
+    if (!e) return !!draft.mood;
+    return e.mood !== draft.mood || e.note !== draft.note || (e.quote || '') !== draft.quote;
+  }
+
+  function setBg(g) {
+    var st = $('stage');
+    var olds = st.querySelectorAll('.bg');
+    var d = h('div', 'bg');
+    d.style.background = g;
+    st.insertBefore(d, cv);
+    if (!olds.length) { d.classList.add('show'); return; }
+    void d.offsetWidth;
+    d.classList.add('show');
+    setTimeout(function () { Array.prototype.forEach.call(olds, function (o) { o.remove(); }); }, 800);
+  }
+  function applyStage(id) {
+    var m = id ? MOODS[id] : null;
+    setBg(m ? m.bg : IDLE_BG);
+    var icon = $('icon');
+    icon.innerHTML = m ? m.svg : IDLE_ICON;
+    icon.classList.remove('pop'); void icon.offsetWidth; icon.classList.add('pop');
+    $('label').textContent = m ? m.name + '・' + m.weather : '今天天氣如何？';
+    initScene(id || 'idle');
+    syncLoop();
+  }
+  function renderQuote() {
+    $('quote').textContent = draft.mood ? (draft.quote || (draft.quote = pickQuote(draft.mood))) : IDLE_QUOTE;
+    $('again').hidden = !draft.mood;
+  }
+  function renderStatus() {
+    var el = $('status'), e = data[editDate];
+    el.classList.remove('dirty');
+    if (!draft.mood) el.textContent = '選好心情，就可以儲存囉';
+    else if (isDirty()) { el.textContent = '還沒儲存，記得按下儲存'; el.classList.add('dirty'); }
+    else {
+      var time = e && e.updatedAt ? new Date(e.updatedAt) : null;
+      el.textContent = '已儲存 ✓' + (time && !isNaN(time) ? '　' + String(time.getHours()).padStart(2, '0') + ':' + String(time.getMinutes()).padStart(2, '0') : '');
+    }
+  }
+  function renderStreak() {
+    var n = currentStreak();
+    $('streak').textContent = n ? '✦ 已連續記錄 ' + n + ' 天' : '';
+  }
+  function renderToday() {
+    var isToday = editDate === todayKey;
+    $('subtitle').textContent = fmtLong(editDate);
+    $('editBanner').hidden = isToday;
+    $('editText').textContent = '正在編輯 ' + fmtShort(editDate) + ' 的紀錄';
+    $('moodTitle').textContent = isToday ? '今天的心情是？' : '這天的心情是？';
+    $('noteTitle').textContent = isToday ? '今天的一句心情' : '這天的一句心情';
+    $('saveBtn').textContent = isToday ? '儲存今天心情' : '儲存這天心情';
+    $('note').value = draft.note;
+    $('count').textContent = draft.note.length + ' / ' + NOTE_MAX;
+    Array.prototype.forEach.call($('moods').children, function (b) { b.classList.toggle('active', b.dataset.mood === draft.mood); });
+    renderQuote(); renderStatus(); renderStreak();
+    applyStage(draft.mood);
+  }
+
+  ORDER.forEach(function (id) {
+    var b = h('button', 'mood');
+    b.type = 'button'; b.dataset.mood = id;
+    b.innerHTML = MOODS[id].svg + '<span>' + MOODS[id].name + '</span>';
+    b.addEventListener('click', function () {
+      if (draft.mood === id) return;
+      draft.mood = id; draft.quote = pickQuote(id);
+      Array.prototype.forEach.call($('moods').children, function (x) { x.classList.toggle('active', x === b); });
+      renderQuote(); renderStatus(); applyStage(id);
+    });
+    $('moods').appendChild(b);
+  });
+
+  $('again').addEventListener('click', function () {
+    if (!draft.mood) return;
+    draft.quote = pickQuote(draft.mood, draft.quote);
+    renderQuote(); renderStatus();
+  });
+  $('note').addEventListener('input', function () {
+    draft.note = this.value.slice(0, NOTE_MAX);
+    $('count').textContent = draft.note.length + ' / ' + NOTE_MAX;
+    renderStatus();
+  });
+  $('note').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveEntry(); } });
+  $('saveBtn').addEventListener('click', saveEntry);
+  $('backToday').addEventListener('click', function () {
+    editDate = todayKey; loadDraft(editDate); renderToday();
+  });
+
+  function saveEntry() {
+    if (!draft.mood) { toast('先選一個心情吧'); return; }
+    data[editDate] = { mood: draft.mood, note: draft.note.trim(), quote: draft.quote, updatedAt: new Date().toISOString() };
+    draft.note = data[editDate].note;
+    $('note').value = draft.note;
+    $('count').textContent = draft.note.length + ' / ' + NOTE_MAX;
+    writeJSON(KEY, data);
+    renderStatus(); renderStreak();
+    var st = $('stage');
+    st.classList.remove('bump'); void st.offsetWidth; st.classList.add('bump');
+    toast(editDate === todayKey ? '今天的心情已記錄 ✓' : fmtShort(editDate) + ' 的心情已記錄 ✓');
+  }
+
+  /* =====================================================
+     月曆頁
+  ===================================================== */
+  var now0 = new Date();
+  var viewMonth = { y: now0.getFullYear(), m: now0.getMonth() };
+  var selDate = null;
+
+  function shiftMonth(delta) {
+    var d = new Date(viewMonth.y, viewMonth.m + delta, 1);
+    var cur = new Date(parseKey(todayKey).getFullYear(), parseKey(todayKey).getMonth(), 1);
+    if (d > cur) return;
+    viewMonth = { y: d.getFullYear(), m: d.getMonth() };
+    selDate = null;
+    renderCalendar(); renderStats();
+  }
+  function isCurrentMonth() {
+    var t = parseKey(todayKey);
+    return viewMonth.y === t.getFullYear() && viewMonth.m === t.getMonth();
+  }
+  function monthTitle() { return viewMonth.y + ' 年 ' + (viewMonth.m + 1) + ' 月'; }
+
+  function renderCalendar() {
+    $('calTitle').textContent = monthTitle();
+    $('calNext').disabled = isCurrentMonth();
+    var g = $('calGrid');
+    g.innerHTML = '';
+    WEEK.forEach(function (w) { g.appendChild(h('div', 'dow', w)); });
+    var first = new Date(viewMonth.y, viewMonth.m, 1).getDay();
+    var days = new Date(viewMonth.y, viewMonth.m + 1, 0).getDate();
+    for (var i = 0; i < first; i++) g.appendChild(h('div', 'cell blank'));
+    for (var d = 1; d <= days; d++) {
+      (function (day) {
+        var key = dateKey(new Date(viewMonth.y, viewMonth.m, day));
+        var b = h('button', 'cell');
+        b.type = 'button';
+        var e = data[key];
+        b.appendChild(h('span', 'num', String(day)));
+        if (e) { var w = h('span'); w.innerHTML = MOODS[e.mood].svg; b.appendChild(w.firstChild); }
+        if (key === todayKey) b.classList.add('today');
+        if (key === selDate) b.classList.add('sel');
+        if (key > todayKey) b.disabled = true;
+        b.setAttribute('aria-label', fmtShort(key) + (e ? ' ' + MOODS[e.mood].name : ' 沒有記錄'));
+        b.addEventListener('click', function () { selDate = key; renderCalendar(); });
+        g.appendChild(b);
+      })(d);
+    }
+    renderDetail();
+  }
+  function renderDetail() {
+    var box = $('detail');
+    box.innerHTML = '';
+    if (!selDate) { box.hidden = true; return; }
+    box.hidden = false;
+    var e = data[selDate];
+    box.appendChild(h('div', 'dt', fmtLong(selDate)));
+    if (e) {
+      var row = h('div', 'row');
+      var ic = h('span'); ic.innerHTML = MOODS[e.mood].svg;
+      row.appendChild(ic.firstChild);
+      row.appendChild(h('div', 'nm', MOODS[e.mood].name + '・' + MOODS[e.mood].weather));
+      box.appendChild(row);
+      if (e.note) box.appendChild(h('p', 'nt', '「' + e.note + '」'));
+      if (e.quote) box.appendChild(h('p', 'qt', e.quote));
+    } else {
+      box.appendChild(h('p', 'nt', '這天還沒有記錄。'));
+    }
+    var acts = h('div', 'acts');
+    var edit = h('button', 'btn small primary', e ? '編輯這天' : '補記這天');
+    edit.type = 'button';
+    edit.addEventListener('click', function () { editDate = selDate; loadDraft(editDate); go('today'); });
+    acts.appendChild(edit);
+    if (e) {
+      var del = h('button', 'btn small danger', '刪除');
+      del.type = 'button';
+      del.addEventListener('click', function () {
+        if (!confirm('確定要刪除 ' + fmtShort(selDate) + ' 的紀錄嗎？')) return;
+        delete data[selDate];
+        writeJSON(KEY, data);
+        if (editDate === selDate) loadDraft(editDate);
+        renderCalendar(); renderStats();
+        toast('已刪除');
+      });
+      acts.appendChild(del);
+    }
+    box.appendChild(acts);
+  }
+  $('calPrev').addEventListener('click', function () { shiftMonth(-1); });
+  $('calNext').addEventListener('click', function () { shiftMonth(1); });
+  $('stPrev').addEventListener('click', function () { shiftMonth(-1); });
+  $('stNext').addEventListener('click', function () { shiftMonth(1); });
+
+  /* =====================================================
+     統計頁
+  ===================================================== */
+  function renderStats() {
+    $('stTitle').textContent = monthTitle();
+    $('stNext').disabled = isCurrentMonth();
+    var prefix = viewMonth.y + '-' + String(viewMonth.m + 1).padStart(2, '0') + '-';
+    var counts = {}, total = 0;
+    ORDER.forEach(function (id) { counts[id] = 0; });
+    Object.keys(data).forEach(function (k) {
+      if (k.indexOf(prefix) === 0) { counts[data[k].mood]++; total++; }
+    });
+    var daysInMonth = new Date(viewMonth.y, viewMonth.m + 1, 0).getDate();
+    var span = isCurrentMonth() ? parseKey(todayKey).getDate() : daysInMonth;
+    $('chDays').textContent = total + ' / ' + span;
+    $('chNow').textContent = currentStreak();
+    $('chBest').textContent = longestStreak();
+
+    var max = 0;
+    ORDER.forEach(function (id) { if (counts[id] > max) max = counts[id]; });
+    var sum = $('sum');
+    if (!total) {
+      sum.textContent = '這個月還沒有記錄，今天開始吧。';
+    } else {
+      var tops = ORDER.filter(function (id) { return counts[id] === max; });
+      if (tops.length === 1) {
+        sum.textContent = '這個月你大多是「' + MOODS[tops[0]].name + '・' + MOODS[tops[0]].weather + '」，共 ' + max + ' 天。';
+      } else if (tops.length === 2) {
+        sum.textContent = '「' + MOODS[tops[0]].name + '」和「' + MOODS[tops[1]].name + '」並列第一，各 ' + max + ' 天。';
+      } else {
+        sum.textContent = '這個月的心情天氣很豐富，有 ' + tops.length + ' 種天氣並列第一（各 ' + max + ' 天）。';
+      }
+    }
+
+    var bars = $('bars');
+    bars.innerHTML = '';
+    var fills = [];
+    ORDER.forEach(function (id) {
+      var row = h('div', 'bar');
+      var ic = h('span'); ic.innerHTML = MOODS[id].svg;
+      row.appendChild(ic.firstChild);
+      row.appendChild(h('span', '', MOODS[id].name));
+      var track = h('div', 'track'), fill = h('div', 'fill');
+      fill.style.background = MOODS[id].color;
+      if (!counts[id]) fill.style.borderWidth = '0';
+      track.appendChild(fill); row.appendChild(track);
+      row.appendChild(h('span', 'n', String(counts[id])));
+      bars.appendChild(row);
+      fills.push([fill, max ? counts[id] / max * 100 : 0]);
+    });
+    setTimeout(function () { fills.forEach(function (f) { f[0].style.width = f[1] + '%'; }); }, 30);
+
+    var rec = $('recent');
+    rec.innerHTML = '';
+    var keys = Object.keys(data).filter(function (k) { return data[k].note; }).sort().reverse().slice(0, 6);
+    if (!keys.length) rec.appendChild(h('div', 'empty-tip', '還沒有寫下任何一句話。'));
+    keys.forEach(function (k) {
+      var it = h('div', 'it');
+      var ic = h('span'); ic.innerHTML = MOODS[data[k].mood].svg;
+      it.appendChild(ic.firstChild);
+      var tx = h('div');
+      tx.appendChild(h('div', 'd', fmtShort(k) + '　' + MOODS[data[k].mood].name));
+      tx.appendChild(h('div', 't', data[k].note));
+      it.appendChild(tx);
+      rec.appendChild(it);
+    });
+  }
+
+  /* =====================================================
+     備份頁
+  ===================================================== */
+  $('animToggle').checked = animOn;
+  $('animToggle').addEventListener('change', function () {
+    animOn = this.checked;
+    settings.anim = animOn;
+    writeJSON(SKEY, settings);
+    scene.still = !animOn;
+    initScene(scene.id);
+    syncLoop();
+    toast(animOn ? '動態效果已開啟' : '動態效果已關閉');
+  });
+
+  $('exportBtn').addEventListener('click', function () {
+    var payload = { app: 'mood-weather-station', version: 2, exportedAt: new Date().toISOString(), entries: data };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'mood-weather-backup-' + todayKey + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    toast('備份檔已下載');
+  });
+
+  var pending = null;
+  function closeImport() { pending = null; $('importBox').hidden = true; $('importFile').value = ''; }
+  $('importBtn').addEventListener('click', function () { $('importFile').click(); });
+  $('importFile').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) { toast('這個檔案看起來不是備份檔'); this.value = ''; return; }
+    var fr = new FileReader();
+    fr.onload = function () {
+      var obj;
+      try { obj = JSON.parse(fr.result); } catch (e) { obj = null; }
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { toast('這個檔案看起來不是備份檔'); closeImport(); return; }
+      var src = (obj.entries && typeof obj.entries === 'object' && !Array.isArray(obj.entries)) ? obj.entries : obj;
+      var res = cleanEntries(src);
+      if (!res.ok) { toast(res.bad ? '這個檔案看起來不是備份檔' : '備份檔裡沒有任何紀錄'); closeImport(); return; }
+      pending = res.entries;
+      $('importInfo').textContent = '讀到 ' + res.ok + ' 筆紀錄' + (res.bad ? '（略過 ' + res.bad + ' 筆無效資料）' : '') + '，要怎麼處理？';
+      $('importBox').hidden = false;
+    };
+    fr.onerror = function () { toast('讀取檔案失敗'); closeImport(); };
+    fr.readAsText(f);
+  });
+  function afterDataChange() {
+    writeJSON(KEY, data);
+    loadDraft(editDate); renderToday(); renderCalendar(); renderStats();
+  }
+  $('doMerge').addEventListener('click', function () {
+    if (!pending) return;
+    Object.keys(pending).forEach(function (k) { data[k] = pending[k]; });
+    closeImport(); afterDataChange(); toast('已合併匯入');
+  });
+  $('doReplace').addEventListener('click', function () {
+    if (!pending) return;
+    if (!confirm('這會取代目前所有紀錄，確定嗎？')) return;
+    data = pending;
+    closeImport(); afterDataChange(); toast('已覆蓋匯入');
+  });
+  $('doCancel').addEventListener('click', closeImport);
+  $('clearBtn').addEventListener('click', function () {
+    if (!confirm('確定要清除全部紀錄嗎？無法復原，建議先下載備份。')) return;
+    data = {};
+    afterDataChange(); toast('已清除全部紀錄');
+  });
+
+  /* =====================================================
+     分頁切換與跨日處理
+  ===================================================== */
+  var VIEWS = ['today', 'calendar', 'stats', 'backup'];
+  function go(v) {
+    if (VIEWS.indexOf(v) < 0) v = 'today';
+    currentView = v;
+    VIEWS.forEach(function (x) { $('view-' + x).hidden = (x !== v); });
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+      if (t.dataset.go === v) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
+    });
+    if (v === 'today') { renderToday(); resizeCanvas(); }
+    else if (v === 'calendar') { $('subtitle').textContent = '回顧每一天的天氣'; renderCalendar(); }
+    else if (v === 'stats') { $('subtitle').textContent = '這個月的心情天氣預報'; renderStats(); }
+    else { $('subtitle').textContent = '備份與設定'; }
+    if (location.hash !== '#' + v) { try { history.replaceState(null, '', '#' + v); } catch (e) { location.hash = v; } }
+    syncLoop();
+    window.scrollTo(0, 0);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.addEventListener('click', function () { go(t.dataset.go); });
+  });
+  window.addEventListener('hashchange', function () {
+    var v = location.hash.slice(1);
+    if (v !== currentView) go(v);
+  });
+
+  function checkDayChange() {
+    var k = dateKey(new Date());
+    if (k === todayKey) return;
+    var wasToday = editDate === todayKey;
+    todayKey = k;
+    if (wasToday && !isDirty()) { editDate = todayKey; loadDraft(editDate); }
+    if (currentView === 'today') renderToday();
+    else if (currentView === 'calendar') renderCalendar();
+    else if (currentView === 'stats') renderStats();
+  }
+  setInterval(checkDayChange, 60000);
+
+  /* ---------- 啟動 ---------- */
+  loadDraft(editDate);
+  go(location.hash.slice(1) || 'today');
+})();
+</script>
+</body>
+</html>
